@@ -795,7 +795,19 @@ impl Window {
         self.command_queue
             .push(WindowCommand::SetCursorPosition { position });
     }
-
+    /// Modifies whether the window catches cursor events.
+    ///
+    /// If true, the window will catch the cursor events. If false, events are passed through the window such that any other window behind it receives them. By default hittest is enabled.
+    pub fn set_cursor_hittest(&mut self, hittest: bool) {
+        self.hittest = hittest;
+        self.command_queue
+            .push(WindowCommand::SetCursorHitTest { hittest });
+    }
+    /// Get whether or not the hittest is active.
+    #[inline]
+    pub fn hittest(&self) -> bool {
+        self.hittest
+    }
     #[allow(missing_docs)]
     #[inline]
     pub fn update_focused_status_from_backend(&mut self, focused: bool) {
