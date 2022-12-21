@@ -736,12 +736,6 @@ impl Window {
         self.command_queue
             .push(WindowCommand::SetCursorGrabMode { grab_mode });
     }
-    /// Modifies whether the window catches cursor events.
-    ///
-    /// If true, the window will catch the cursor events. If false, events are passed through the window such that any other window behind it receives them. By default hittest is enabled.
-    pub fn set_cursor_hittest(&mut self, hittest: bool) {
-        self.hittest = hittest;
-    }
     /// Get whether or not the cursor is visible.
     ///
     /// ## Platform-specific
