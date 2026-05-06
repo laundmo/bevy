@@ -1874,7 +1874,7 @@ mod tests {
     }
 
     #[test]
-    fn scene_component_name_reference() {
+    fn tuple_scene_component_name_reference() {
         #[derive(SceneComponent, FromTemplate)]
         struct Widget(pub Entity);
 
@@ -1885,10 +1885,10 @@ mod tests {
         }
 
         let scene = bsn! {
-          #Name
-          Children [
-              :Widget(#Name)
-          ]
+            #Name
+            Children [
+                :Widget(#Name)
+            ]
         };
 
         let mut app = test_app();
@@ -1898,6 +1898,110 @@ mod tests {
         let children = root.get::<Children>().unwrap();
         let child_widget = world.entity(children[0]).get::<Widget>().unwrap();
         assert_eq!(child_widget.0, entity);
+    }
+
+    #[test]
+    fn named_scene_component_name_reference() {
+        #[derive(SceneComponent, FromTemplate)]
+        struct Widget {
+            entity: Entity,
+        }
+
+        impl Widget {
+            fn scene() -> impl Scene {
+                bsn! {}
+            }
+        }
+
+        let scene = bsn! {
+            #Name
+            Children [
+                :Widget{
+                    entity: #Name
+                }
+            ]
+        };
+
+        let mut app = test_app();
+        let world = app.world_mut();
+        let entity = world.spawn_scene(scene).unwrap().id();
+        let root = world.entity(entity);
+        let children = root.get::<Children>().unwrap();
+        let child_widget = world.entity(children[0]).get::<Widget>().unwrap();
+        assert_eq!(child_widget.entity, entity);
+    }
+
+    #[test]
+    fn scene_function_name_reference() {
+        fn widget(entity: Entity) -> impl Scene {
+            bsn! {
+                ChildOf(entity) // redundant due to Children, only for the test
+            }
+        }
+        let scene_a_works = bsn! {
+            Children [
+                :widget(Entity::PLACEHOLDER)
+            ]
+        };
+        let scene_b_works = bsn! {
+            Children [
+                widget(Entity::PLACEHOLDER)
+            ]
+        };
+        let scene_a_borked = bsn! {
+            #Name
+            Children [
+                :widget(#Name)
+            ]
+        };
+        let scene_b_borked = bsn! {
+            #Name
+            Children [
+                widget(#Name)
+            ]
+        };
+    }
+
+    #[test]
+    fn scene_component_prop_name_reference() {
+        #[derive(SceneComponent, Clone, Default)]
+        #[scene(WidgetProps)]
+        struct Widget;
+
+        struct WidgetProps {
+            entity: Entity,
+        }
+        impl Default for WidgetProps {
+            fn default() -> Self {
+                Self {
+                    entity: Entity::PLACEHOLDER,
+                }
+            }
+        }
+
+        impl Widget {
+            fn scene(props: WidgetProps) -> impl Scene {
+                let entity = props.entity;
+                bsn! {
+                    ChildOf(entity)
+                }
+            }
+        }
+        let scene_works = bsn! {
+            Children [
+                :Widget {
+                    @entity: Entity::PLACEHOLDER
+                }
+            ]
+        };
+        let scene_borked = bsn! {
+            #Name
+            Children [
+                :Widget {
+                    @entity: #Name
+                }
+            ]
+        };
     }
 
     #[test]
