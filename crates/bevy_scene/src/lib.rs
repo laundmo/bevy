@@ -1993,6 +1993,8 @@ mod tests {
     #[test]
     fn scene_component_prop_name_reference() {
         use bevy_ecs::template::EntityTemplate;
+        #[derive(Component, FromTemplate)]
+        struct Reference(Entity);
 
         #[derive(SceneComponent, Clone, Default)]
         #[scene(WidgetProps)]
@@ -2013,7 +2015,7 @@ mod tests {
             fn scene(props: WidgetProps) -> impl Scene {
                 let entity = props.entity;
                 bsn! {
-                    ChildOf(#{entity})
+                    Reference(#{entity})
                 }
             }
         }
