@@ -402,12 +402,14 @@ impl<T: Clone + Default + Unpin> FromTemplate for T {
 pub trait SpecializeFromTemplate: Sized {}
 
 /// A [`Template`] reference to an [`Entity`].
+#[derive(Copy, Clone, Debug)]
 pub enum EntityTemplate {
     /// A reference to a specific [`Entity`]
     Entity(Entity),
     /// A reference to an entity via a [`ScopedEntityIndex`]
     ScopedEntityIndex(ScopedEntityIndex),
 }
+impl Unpin for EntityTemplate where for<'a> [()]: SpecializeFromTemplate {}
 
 /// An entity index within the current [`TemplateContext`], which is defined by a scope
 /// and an index. This references a specific (and sometimes yet-to-be-spawned) entity defined

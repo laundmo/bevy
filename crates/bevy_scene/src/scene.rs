@@ -477,6 +477,29 @@ impl<S: Scene> Scene for SceneScope<S> {
     }
 }
 
+pub struct SceneScopeFn<F, S>(pub F)
+where
+    F: Fn(&mut ResolveContext, &mut ResolvedScene) -> S,
+    S: Scene;
+impl<F, S> Scene for SceneScopeFn<F, S>
+where
+    F: Fn(&mut ResolveContext, &mut ResolvedScene) -> S + Send + Sync + 'static,
+    S: Scene,
+{
+    fn resolve(
+        self,
+        context: &mut ResolveContext,
+        scene: &mut ResolvedScene,
+    ) -> Result<(), ResolveSceneError> {
+        let inner_scene = self.0(context, scene);
+        let scope = SceneScope(inner_scene);
+        scope.resolve(context, scene)
+    }
+
+    fn register_dependencies(&self, dependencies: &mut SceneDependencies) {
+        // uh oh, this *cant* be a no-op...
+    }
+}
 /// A [`SceneList`] that will create a new "entity scope" and fully resolve the given scene list `L` on top of the current [`Vec<ResolvedScene>`]
 /// (using that scope). It is not "inherited" or cached.
 #[must_use]
