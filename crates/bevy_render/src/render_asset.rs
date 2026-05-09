@@ -3,7 +3,7 @@ use crate::{
     RenderStartup, RenderSystems, Res,
 };
 use bevy_app::{App, Plugin, SubApp};
-use bevy_asset::{Asset, AssetEvent, AssetId, Assets, RenderAssetUsages};
+use bevy_asset::{Asset, AssetEvent, AssetId, Assets, Handle, RenderAssetUsages};
 use bevy_ecs::{
     prelude::{Commands, IntoScheduleConfigs, Local, MessageReader, ResMut, Resource},
     schedule::{ScheduleConfigs, SystemSet},
@@ -11,7 +11,11 @@ use bevy_ecs::{
     world::{FromWorld, Mut},
 };
 use bevy_log::{debug, error};
-use bevy_platform::collections::{HashMap, HashSet};
+use bevy_platform::{
+    collections::HashSet,
+    hash::{Hashed, PassHash},
+};
+use bevy_utils::PreHashMap;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use thiserror::Error;
@@ -176,18 +180,18 @@ pub struct ExtractedAssets<A: RenderAsset> {
     /// The assets extracted this frame.
     ///
     /// These are assets that were either added or modified this frame.
-    pub extracted: Vec<(AssetId<A::SourceAsset>, A::SourceAsset)>,
+    pub extracted: Vec<(Hashed<AssetId<A::SourceAsset>>, A::SourceAsset)>,
 
     /// IDs of the assets that were removed this frame.
     ///
     /// These assets will not be present in [`ExtractedAssets::extracted`].
-    pub removed: HashSet<AssetId<A::SourceAsset>>,
+    pub removed: HashSet<Hashed<AssetId<A::SourceAsset>>, PassHash>,
 
     /// IDs of the assets that were modified this frame.
-    pub modified: HashSet<AssetId<A::SourceAsset>>,
+    pub modified: HashSet<Hashed<AssetId<A::SourceAsset>>, PassHash>,
 
     /// IDs of the assets that were added this frame.
-    pub added: HashSet<AssetId<A::SourceAsset>>,
+    pub added: HashSet<Hashed<AssetId<A::SourceAsset>>, PassHash>,
 }
 
 impl<A: RenderAsset> Default for ExtractedAssets<A> {
@@ -204,36 +208,62 @@ impl<A: RenderAsset> Default for ExtractedAssets<A> {
 /// Stores all GPU representations ([`RenderAsset`])
 /// of [`RenderAsset::SourceAsset`] as long as they exist.
 #[derive(Resource)]
-pub struct RenderAssets<A: RenderAsset>(HashMap<AssetId<A::SourceAsset>, A>);
+pub struct RenderAssets<A: RenderAsset>(PreHashMap<AssetId<A::SourceAsset>, A>);
 
 impl<A: RenderAsset> Default for RenderAssets<A> {
     fn default() -> Self {
         Self(Default::default())
     }
 }
-
+pub trait IntoHashedAssetId<A: RenderAsset> {
+    fn into_hashed_asset_id(self) -> Hashed<AssetId<A::SourceAsset>>;
+}
+impl<A: RenderAsset> IntoHashedAssetId<A> for &Handle<A::SourceAsset> {
+    #[inline]
+    fn into_hashed_asset_id(self) -> Hashed<AssetId<A::SourceAsset>> {
+        self.id().into()
+    }
+}
+impl<A: RenderAsset> IntoHashedAssetId<A> for Handle<A::SourceAsset> {
+    #[inline]
+    fn into_hashed_asset_id(self) -> Hashed<AssetId<A::SourceAsset>> {
+        self.id().into()
+    }
+}
+impl<A: RenderAsset> IntoHashedAssetId<A> for AssetId<A::SourceAsset> {
+    #[inline]
+    fn into_hashed_asset_id(self) -> Hashed<AssetId<A::SourceAsset>> {
+        self.into()
+    }
+}
+impl<A: RenderAsset> IntoHashedAssetId<A> for Hashed<AssetId<A::SourceAsset>> {
+    #[inline]
+    fn into_hashed_asset_id(self) -> Hashed<AssetId<A::SourceAsset>> {
+        self
+    }
+}
 impl<A: RenderAsset> RenderAssets<A> {
-    pub fn get(&self, id: impl Into<AssetId<A::SourceAsset>>) -> Option<&A> {
-        self.0.get(&id.into())
+    pub fn get(&self, id: impl IntoHashedAssetId<A>) -> Option<&A> {
+        self.0.get(&id.into_hashed_asset_id())
     }
 
-    pub fn get_mut(&mut self, id: impl Into<AssetId<A::SourceAsset>>) -> Option<&mut A> {
-        self.0.get_mut(&id.into())
+    pub fn get_mut(&mut self, id: impl IntoHashedAssetId<A>) -> Option<&mut A> {
+        self.0.get_mut(&id.into_hashed_asset_id())
     }
 
-    pub fn insert(&mut self, id: impl Into<AssetId<A::SourceAsset>>, value: A) -> Option<A> {
-        self.0.insert(id.into(), value)
+    pub fn insert(&mut self, id: impl IntoHashedAssetId<A>, value: A) -> Option<A> {
+        self.0.insert(id.into_hashed_asset_id(), value)
     }
 
-    pub fn remove(&mut self, id: impl Into<AssetId<A::SourceAsset>>) -> Option<A> {
-        self.0.remove(&id.into())
+    pub fn remove(&mut self, id: impl IntoHashedAssetId<A>) -> Option<A> {
+        self.0.remove(&id.into_hashed_asset_id())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (AssetId<A::SourceAsset>, &A)> {
+    pub fn iter(&self) -> impl Iterator<Item = (Hashed<AssetId<A::SourceAsset>>, &A)> {
         self.0.iter().map(|(k, v)| (*k, v))
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (AssetId<A::SourceAsset>, &mut A)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Hashed<AssetId<A::SourceAsset>>, &mut A)> {
         self.0.iter_mut().map(|(k, v)| (*k, v))
     }
 }
@@ -259,7 +289,7 @@ impl<A: RenderAsset> FromWorld for CachedExtractRenderAssetSystemState<A> {
 /// re-extraction from the main world after device recovery.
 #[derive(Resource)]
 pub(crate) struct RenderAssetsToReExtract<A: RenderAsset> {
-    ids: Vec<AssetId<A::SourceAsset>>,
+    ids: Vec<Hashed<AssetId<A::SourceAsset>>>,
 }
 
 /// Drains all asset IDs from [`RenderAssets<A>`] to mark for re-extraction.
@@ -281,7 +311,7 @@ pub(crate) fn extract_render_asset<A: RenderAsset>(
     mut to_reextract: Option<ResMut<RenderAssetsToReExtract<A>>>,
     mut extracted_assets: ResMut<ExtractedAssets<A>>,
     mut main_world: ResMut<MainWorld>,
-    mut needs_extracting: Local<HashSet<AssetId<A::SourceAsset>>>,
+    mut needs_extracting: Local<HashSet<Hashed<AssetId<A::SourceAsset>>, PassHash>>,
 ) {
     extracted_assets.extracted.clear();
     extracted_assets.removed.clear();
@@ -309,20 +339,21 @@ pub(crate) fn extract_render_asset<A: RenderAsset>(
                 )]
                 match event {
                     AssetEvent::Added { id } => {
-                        needs_extracting.insert(*id);
+                        needs_extracting.insert((*id).into());
                     }
                     AssetEvent::Modified { id } => {
-                        needs_extracting.insert(*id);
-                        extracted_assets.modified.insert(*id);
+                        needs_extracting.insert((*id).into());
+                        extracted_assets.modified.insert((*id).into());
                     }
                     AssetEvent::Removed { .. } => {
                         // We don't care that the asset was removed from Assets<T> in the main world.
                         // An asset is only removed from RenderAssets<T> when its last handle is dropped (AssetEvent::Unused).
                     }
                     AssetEvent::Unused { id } => {
-                        needs_extracting.remove(id);
-                        extracted_assets.modified.remove(id);
-                        extracted_assets.removed.insert(*id);
+                        let id = (*id).into();
+                        needs_extracting.remove(&id);
+                        extracted_assets.modified.remove(&id);
+                        extracted_assets.removed.insert(id);
                     }
                     AssetEvent::LoadedWithDependencies { .. } => {
                         // TODO: handle this
@@ -330,17 +361,17 @@ pub(crate) fn extract_render_asset<A: RenderAsset>(
                 }
             }
 
-            for id in needs_extracting.drain() {
-                if let Some(asset) = assets.get(id) {
+            for hashed_id in needs_extracting.drain() {
+                if let Some(asset) = assets.get(*hashed_id) {
                     let asset_usage = A::asset_usage(asset);
                     if asset_usage.contains(RenderAssetUsages::RENDER_WORLD) {
                         if asset_usage == RenderAssetUsages::RENDER_WORLD {
-                            if let Some(asset) = assets.get_mut_untracked(id) {
-                                let previous_asset = maybe_render_assets.as_ref().and_then(|render_assets| render_assets.get(id));
+                            if let Some(asset) = assets.get_mut_untracked(*hashed_id) {
+                                let previous_asset = maybe_render_assets.as_ref().and_then(|render_assets| render_assets.get(hashed_id));
                                 match A::take_gpu_data(asset, previous_asset) {
                                     Ok(gpu_data_asset) => {
-                                        extracted_assets.extracted.push((id, gpu_data_asset));
-                                        extracted_assets.added.insert(id);
+                                        extracted_assets.extracted.push((hashed_id, gpu_data_asset));
+                                        extracted_assets.added.insert(hashed_id);
                                     }
                                     Err(e) => {
                                         error!("{} with RenderAssetUsages == RENDER_WORLD cannot be extracted: {e}", core::any::type_name::<A>());
@@ -348,8 +379,8 @@ pub(crate) fn extract_render_asset<A: RenderAsset>(
                                 };
                             }
                         } else {
-                            extracted_assets.extracted.push((id, asset.clone()));
-                            extracted_assets.added.insert(id);
+                            extracted_assets.extracted.push((hashed_id, asset.clone()));
+                            extracted_assets.added.insert(hashed_id);
                         }
                     }
                 }
@@ -364,7 +395,7 @@ pub(crate) fn extract_render_asset<A: RenderAsset>(
 /// All assets that should be prepared next frame.
 #[derive(Resource)]
 pub struct PrepareNextFrameAssets<A: RenderAsset> {
-    assets: Vec<(AssetId<A::SourceAsset>, A::SourceAsset)>,
+    assets: Vec<(Hashed<AssetId<A::SourceAsset>>, A::SourceAsset)>,
 }
 
 impl<A: RenderAsset> Default for PrepareNextFrameAssets<A> {
@@ -388,8 +419,10 @@ pub fn prepare_assets<A: RenderAsset>(
 
     let mut param = param.into_inner();
     let queued_assets = core::mem::take(&mut prepare_next_frame.assets);
-    for (id, extracted_asset) in queued_assets {
-        if extracted_assets.removed.contains(&id) || extracted_assets.added.contains(&id) {
+    for (hashed_id, extracted_asset) in queued_assets {
+        if extracted_assets.removed.contains(&hashed_id)
+            || extracted_assets.added.contains(&hashed_id)
+        {
             // skip previous frame's assets that have been removed or updated
             continue;
         }
@@ -400,7 +433,7 @@ pub fn prepare_assets<A: RenderAsset>(
             // this way we always write at least one (sized) asset per frame.
             // in future we could also consider partial asset uploads.
             if bpf.exhausted() {
-                prepare_next_frame.assets.push((id, extracted_asset));
+                prepare_next_frame.assets.push((hashed_id, extracted_asset));
                 continue;
             }
             size
@@ -408,15 +441,15 @@ pub fn prepare_assets<A: RenderAsset>(
             0
         };
 
-        let previous_asset = render_assets.get(id);
-        match A::prepare_asset(extracted_asset, id, &mut param, previous_asset) {
+        let previous_asset = render_assets.get(hashed_id);
+        match A::prepare_asset(extracted_asset, *hashed_id, &mut param, previous_asset) {
             Ok(prepared_asset) => {
-                render_assets.insert(id, prepared_asset);
+                render_assets.insert(hashed_id, prepared_asset);
                 bpf.write_bytes(write_bytes);
                 wrote_asset_count += 1;
             }
             Err(PrepareAssetError::RetryNextUpdate(extracted_asset)) => {
-                prepare_next_frame.assets.push((id, extracted_asset));
+                prepare_next_frame.assets.push((hashed_id, extracted_asset));
             }
             Err(PrepareAssetError::AsBindGroupError(e)) => {
                 error!(
@@ -429,7 +462,7 @@ pub fn prepare_assets<A: RenderAsset>(
 
     for removed in extracted_assets.removed.drain() {
         render_assets.remove(removed);
-        A::unload_asset(removed, &mut param);
+        A::unload_asset(*removed, &mut param);
     }
 
     for (id, extracted_asset) in extracted_assets.extracted.drain(..) {
@@ -448,7 +481,7 @@ pub fn prepare_assets<A: RenderAsset>(
             0
         };
 
-        match A::prepare_asset(extracted_asset, id, &mut param, previous_asset.as_ref()) {
+        match A::prepare_asset(extracted_asset, *id, &mut param, previous_asset.as_ref()) {
             Ok(prepared_asset) => {
                 render_assets.insert(id, prepared_asset);
                 bpf.write_bytes(write_bytes);

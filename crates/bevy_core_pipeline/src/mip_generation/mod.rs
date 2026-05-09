@@ -33,6 +33,7 @@ use bevy_image::Image;
 use bevy_log::error;
 use bevy_math::{vec2, Vec2};
 use bevy_platform::collections::{hash_map::Entry, HashMap, HashSet};
+use bevy_platform::hash::Hashed;
 use bevy_render::{
     diagnostic::RecordDiagnostics as _,
     render_asset::RenderAssets,
@@ -53,7 +54,7 @@ use bevy_render::{
 };
 use bevy_render::{GpuResourceAppExt, Render, RenderApp, RenderSystems};
 use bevy_shader::{Shader, ShaderDefVal};
-use bevy_utils::default;
+use bevy_utils::{default, PreHashMap};
 
 pub mod experimental;
 
@@ -151,7 +152,7 @@ impl MipGenerationJobs {
     /// Note that, by default, Bevy doesn't automatically add any such system to
     /// the render schedule; it's up to you to manually add that system.
     pub fn add(&mut self, phase: MipGenerationPhaseId, image: impl Into<AssetId<Image>>) {
-        self.entry(phase).or_default().push(image.into());
+        self.entry(phase).or_default().push(image.into().into());
     }
 }
 
@@ -164,7 +165,7 @@ impl MipGenerationJobs {
 /// To add images to this list, use [`MipGenerationJobs::add`] in a render app
 /// system.
 #[derive(Default, Deref, DerefMut)]
-pub struct MipGenerationPhase(pub Vec<AssetId<Image>>);
+pub struct MipGenerationPhase(pub Vec<Hashed<AssetId<Image>>>);
 
 /// Identifies a *phase* during which mipmaps will be generated for an image.
 ///
@@ -200,7 +201,7 @@ pub struct MipGenerationPipelines {
     ///
     /// These are cached from frame to frame if the same image needs mips
     /// generated for it on immediately-consecutive frames.
-    bind_groups: HashMap<AssetId<Image>, MipGenerationJobBindGroups>,
+    bind_groups: PreHashMap<AssetId<Image>, MipGenerationJobBindGroups>,
 }
 
 /// The compute pipelines and bind group layouts for the single-pass

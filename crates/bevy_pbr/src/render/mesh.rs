@@ -39,6 +39,7 @@ use bevy_mesh::{
     VertexAttributeDescriptor,
 };
 use bevy_platform::collections::{hash_map::Entry, HashMap};
+use bevy_platform::hash::Hashed;
 use bevy_render::batching::gpu_preprocessing::PreviousInstanceInputUniformBuffer;
 use bevy_render::impl_atomic_pod;
 use bevy_render::mesh::allocator::{MeshSlabId, MeshSlabs};
@@ -69,7 +70,7 @@ use bevy_render::{
 };
 use bevy_shader::{load_shader_library, Shader, ShaderDefVal, ShaderSettings};
 use bevy_transform::components::GlobalTransform;
-use bevy_utils::{default, Parallel, TypeIdMap};
+use bevy_utils::{default, Parallel, PreHashMap, TypeIdMap};
 use core::any::TypeId;
 use core::iter;
 use core::mem::{offset_of, size_of};
@@ -3684,7 +3685,7 @@ pub enum MeshMorphTargetBindGroups {
     /// We use morph target images on platforms without storage buffers, and as
     /// such platforms don't support bindless textures either, we must use a
     /// single bind group per morphable mesh.
-    Uniform(HashMap<AssetId<Mesh>, MeshBindGroupPair>),
+    Uniform(PreHashMap<AssetId<Mesh>, MeshBindGroupPair>),
 
     /// Maps a morph target slab ID that the mesh allocator manages to the bind
     /// groups for morph displacements in that slab.
@@ -3769,7 +3770,7 @@ impl MeshPhaseBindGroups {
         match (is_skinned, morph, lightmap) {
             (_, MeshMorphBindGroupKey::Uniform(asset_id), _) => match self.morph_targets {
                 MeshMorphTargetBindGroups::Uniform(ref morph_targets) => morph_targets
-                    .get(&asset_id)
+                    .get(&Hashed::new(asset_id))
                     .map(|bind_group_pair| bind_group_pair.get(motion_vectors)),
                 MeshMorphTargetBindGroups::Storage(..) => {
                     error!(
@@ -4034,8 +4035,8 @@ fn prepare_mesh_morph_target_bind_groups_for_phase_using_uniforms(
     pipeline_cache: &PipelineCache,
     skins_uniform: &SkinUniforms,
     weights_uniform: &MorphUniforms,
-    mesh_id_to_image: &HashMap<AssetId<Mesh>, MorphTargetImage>,
-    morph_targets: &mut HashMap<AssetId<Mesh>, MeshBindGroupPair>,
+    mesh_id_to_image: &PreHashMap<AssetId<Mesh>, MorphTargetImage>,
+    morph_targets: &mut PreHashMap<AssetId<Mesh>, MeshBindGroupPair>,
 ) {
     let (skin, prev_skin) = (&skins_uniform.current_buffer, &skins_uniform.prev_buffer);
     let weights = weights_uniform

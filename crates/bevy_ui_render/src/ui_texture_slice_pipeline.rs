@@ -77,7 +77,7 @@ struct UiTextureSliceVertex {
 #[derive(Component)]
 pub struct UiTextureSlicerBatch {
     pub range: Range<u32>,
-    pub image: AssetId<Image>,
+    pub image: Hashed<AssetId<Image>>,
 }
 
 #[derive(Resource)]
@@ -99,7 +99,7 @@ impl Default for UiTextureSliceMeta {
 
 #[derive(Resource, Default)]
 pub struct UiTextureSliceImageBindGroups {
-    pub values: HashMap<AssetId<Image>, BindGroup>,
+    pub values: PreHashMap<AssetId<Image>, BindGroup>,
 }
 
 #[derive(Resource)]
@@ -195,7 +195,7 @@ pub struct ExtractedUiTextureSlice {
     pub transform: Affine2,
     pub rect: Rect,
     pub atlas_rect: Option<Rect>,
-    pub image: AssetId<Image>,
+    pub image: Hashed<AssetId<Image>>,
     pub clip: Option<Rect>,
     pub extracted_camera_entity: Entity,
     pub color: LinearRgba,
@@ -295,7 +295,7 @@ pub fn extract_ui_texture_slices(
                 max: visual_box.size(),
             },
             clip: clip.map(|clip| clip.clip),
-            image: image.image.id(),
+            image: image.image.id().into(),
             extracted_camera_entity,
             image_scale_mode,
             atlas_rect,
@@ -382,7 +382,7 @@ pub fn prepare_ui_slices(
             // Images don't have dependencies
             AssetEvent::LoadedWithDependencies { .. } => {}
             AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                image_bind_groups.values.remove(id);
+                image_bind_groups.values.remove(&Hashed::new(*id));
             }
         };
     }
@@ -418,8 +418,8 @@ pub fn prepare_ui_slices(
 
                     if batch_image_handle.is_none()
                         || existing_batch.is_none()
-                        || (batch_image_handle != Some(AssetId::default())
-                            && texture_slices.image != AssetId::default()
+                        || (batch_image_handle != Some(Hashed::default())
+                            && texture_slices.image != Hashed::default()
                             && batch_image_handle != Some(texture_slices.image))
                     {
                         if let Some(gpu_image) = gpu_images.get(texture_slices.image) {
@@ -455,8 +455,8 @@ pub fn prepare_ui_slices(
                             continue;
                         }
                     } else if let Some(ref mut existing_batch) = existing_batch
-                        && batch_image_handle == Some(AssetId::default())
-                        && texture_slices.image != AssetId::default()
+                        && batch_image_handle == Some(Hashed::default())
+                        && texture_slices.image != Hashed::default()
                     {
                         if let Some(gpu_image) = gpu_images.get(texture_slices.image) {
                             batch_image_handle = Some(texture_slices.image);
@@ -541,7 +541,7 @@ pub fn prepare_ui_slices(
                             continue;
                         }
                     }
-                    let flags = if texture_slices.image != AssetId::default() {
+                    let flags = if texture_slices.image != Hashed::default() {
                         shader_flags::TEXTURED
                     } else {
                         shader_flags::UNTEXTURED

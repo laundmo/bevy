@@ -8,7 +8,8 @@ use bevy_mesh::{
     morph::{MorphAttributes, MorphBuildError, MAX_MORPH_WEIGHTS, MAX_TEXTURE_WIDTH},
     Mesh,
 };
-use bevy_platform::collections::HashMap;
+use bevy_platform::{collections::HashMap, hash::Hashed};
+use bevy_utils::PreHashMap;
 use wgpu::{
     Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     TextureViewDescriptor,
@@ -123,7 +124,7 @@ pub enum RenderMorphTargetAllocator {
     Image {
         /// Maps the ID of each mesh to the image containing its morph target
         /// displacements.
-        mesh_id_to_image: HashMap<AssetId<Mesh>, MorphTargetImage>,
+        mesh_id_to_image: PreHashMap<AssetId<Mesh>, MorphTargetImage>,
     },
     /// The variant used when the current platform does support storage buffers.
     ///
@@ -175,7 +176,7 @@ impl RenderMorphTargetAllocator {
         &mut self,
         render_device: &RenderDevice,
         render_queue: &RenderQueue,
-        mesh_id: AssetId<Mesh>,
+        mesh_id: Hashed<AssetId<Mesh>>,
         targets: &[MorphAttributes],
         vertex_count: usize,
     ) {
@@ -207,7 +208,7 @@ impl RenderMorphTargetAllocator {
     /// are managed by the mesh allocator in this case.
     ///
     /// If passed a mesh without morph targets, this method does nothing.
-    pub fn free(&mut self, mesh_id: AssetId<Mesh>) {
+    pub fn free(&mut self, mesh_id: Hashed<AssetId<Mesh>>) {
         match *self {
             RenderMorphTargetAllocator::Image {
                 ref mut mesh_id_to_image,
@@ -233,7 +234,7 @@ impl RenderMorphTargetAllocator {
     /// supported on the given platform. If storage buffers are supported, this
     /// method returns `None`, as the mesh allocator stores the morph target
     /// displacements in that case.
-    pub fn get_image(&self, mesh_id: AssetId<Mesh>) -> Option<MorphTargetImage> {
+    pub fn get_image(&self, mesh_id: Hashed<AssetId<Mesh>>) -> Option<MorphTargetImage> {
         match *self {
             RenderMorphTargetAllocator::Image {
                 ref mesh_id_to_image,

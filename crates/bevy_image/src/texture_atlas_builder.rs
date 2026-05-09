@@ -1,6 +1,7 @@
 use bevy_asset::{AssetId, RenderAssetUsages};
 use bevy_math::{URect, UVec2};
 use bevy_platform::collections::HashMap;
+use bevy_utils::PreHashMap;
 use rectangle_pack::{
     contains_smallest_box, pack_rects, volume_heuristic, GroupedRectsToPlace, PackedLocation,
     RectToInsert, TargetBin,
@@ -272,7 +273,7 @@ impl<'a> TextureAtlasBuilder<'a> {
         let rect_placements = rect_placements.ok_or(TextureAtlasBuilderError::NotEnoughSpace)?;
 
         let mut texture_rects = Vec::with_capacity(rect_placements.packed_locations().len());
-        let mut texture_ids = <HashMap<_, _>>::default();
+        let mut texture_ids = <PreHashMap<_, _>>::default();
         // We iterate through the textures to place to respect the insertion order for the texture indices
         for (index, (image_id, texture)) in self.textures_to_place.iter().enumerate() {
             let (_, packed_location) = rect_placements.packed_locations().get(&index).unwrap();
@@ -281,7 +282,7 @@ impl<'a> TextureAtlasBuilder<'a> {
             let max =
                 min + UVec2::new(packed_location.width(), packed_location.height()) - self.padding;
             if let Some(image_id) = image_id {
-                texture_ids.insert(*image_id, index);
+                texture_ids.insert((*image_id).into(), index);
             }
             texture_rects.push(URect { min, max });
             if texture.texture_descriptor.format != self.format && !self.auto_format_conversion {

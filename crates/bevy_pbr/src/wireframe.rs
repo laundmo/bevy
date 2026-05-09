@@ -22,7 +22,7 @@ use bevy_ecs::{
 use bevy_mesh::{Mesh, Mesh3d, MeshVertexBufferLayoutRef};
 use bevy_platform::{
     collections::{HashMap, HashSet},
-    hash::FixedHasher,
+    hash::{FixedHasher, Hashed, PassHash},
 };
 use bevy_reflect::{std_traits::ReflectDefault, Reflect};
 use bevy_render::{
@@ -58,6 +58,7 @@ use bevy_render::{
     Extract, GpuResourceAppExt, Render, RenderApp, RenderDebugFlags, RenderStartup, RenderSystems,
 };
 use bevy_shader::Shader;
+use bevy_utils::PreHashMap;
 use bytemuck::{Pod, Zeroable};
 use core::{any::TypeId, hash::Hash, mem::size_of, ops::Range};
 use tracing::{error, warn};
@@ -407,7 +408,7 @@ pub struct WireframeVertexPullParams {
 #[derive(Resource, Default)]
 pub struct WireframeWideBindGroups {
     pub params: DynamicUniformBuffer<WireframeVertexPullParams>,
-    pub bind_groups: HashMap<AssetId<Mesh>, (BindGroup, u32)>,
+    pub bind_groups: PreHashMap<AssetId<Mesh>, (BindGroup, u32)>,
 }
 
 pub fn prepare_wireframe_wide_bind_groups(
@@ -424,14 +425,14 @@ pub fn prepare_wireframe_wide_bind_groups(
     wide_bind_groups.bind_groups.clear();
 
     struct MeshInfo {
-        mesh_id: AssetId<Mesh>,
+        mesh_id: Hashed<AssetId<Mesh>>,
         params: WireframeVertexPullParams,
         vertex_buffer: Buffer,
         index_buffer: Buffer,
     }
 
     let mut infos: Vec<MeshInfo> = Vec::new();
-    let mut seen: HashSet<AssetId<Mesh>, FixedHasher> = HashSet::default();
+    let mut seen: HashSet<Hashed<AssetId<Mesh>>, PassHash> = HashSet::default();
 
     for (entity, wireframe_asset_id) in render_wireframe_instances.iter() {
         let Some(material) = render_wireframe_assets.get(*wireframe_asset_id) else {
@@ -444,7 +445,7 @@ pub fn prepare_wireframe_wide_bind_groups(
         let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(*entity) else {
             continue;
         };
-        let mesh_id = mesh_instance.mesh_asset_id();
+        let mesh_id = mesh_instance.mesh_asset_id().into();
         if !seen.insert(mesh_id) {
             continue;
         }
@@ -543,7 +544,7 @@ impl<P: PhaseItem> RenderCommand<P> for SetWireframe3dWideBindGroup {
         let Some((bind_group, dynamic_offset)) = wide_bind_groups
             .into_inner()
             .bind_groups
-            .get(&mesh_instance.mesh_asset_id())
+            .get(&Hashed::new(mesh_instance.mesh_asset_id()))
         else {
             return RenderCommandResult::Skip;
         };

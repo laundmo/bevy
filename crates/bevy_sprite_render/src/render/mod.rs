@@ -20,7 +20,7 @@ use bevy_ecs::{
 use bevy_image::{Image, TextureAtlasLayout};
 use bevy_math::{Affine3A, FloatOrd, Quat, Rect, Vec2, Vec4};
 use bevy_mesh::VertexBufferLayout;
-use bevy_platform::collections::HashMap;
+use bevy_platform::{collections::HashMap, hash::Hashed};
 use bevy_render::{
     camera::ExtractedCamera,
     view::{RenderVisibleEntities, RetainedViewEntity},
@@ -47,7 +47,7 @@ use bevy_render::{
 use bevy_shader::{Shader, ShaderDefVal};
 use bevy_sprite::{Anchor, Sprite, SpriteScalingMode};
 use bevy_transform::components::GlobalTransform;
-use bevy_utils::default;
+use bevy_utils::{default, PreHashMap};
 use bytemuck::{Pod, Zeroable};
 use fixedbitset::FixedBitSet;
 
@@ -310,8 +310,9 @@ pub struct ExtractedSprite {
     pub color: LinearRgba,
     /// Change the on-screen size of the sprite
     /// Asset ID of the [`Image`] of this sprite
-    /// PERF: storing an `AssetId` instead of `Handle<Image>` enables some optimizations (`ExtractedSprite` becomes `Copy` and doesn't need to be dropped)
-    pub image_handle_id: AssetId<Image>,
+    /// PERF: storing an `Hashed<AssetId>` instead of `Handle<Image>` enables some optimizations (`ExtractedSprite` becomes `Copy` and doesn't need to be dropped)
+    ///    with the Hashed part allowing for hashmap key pre-computation
+    pub image_handle_id: Hashed<AssetId<Image>>,
     pub flip_x: bool,
     pub flip_y: bool,
     pub kind: ExtractedSpriteKind,
@@ -395,7 +396,7 @@ pub fn extract_sprites(
                 transform: *transform,
                 flip_x: sprite.flip_x,
                 flip_y: sprite.flip_y,
-                image_handle_id: sprite.image.id(),
+                image_handle_id: sprite.image.id().into(),
                 kind: ExtractedSpriteKind::Slices {
                     indices: start..end,
                 },
@@ -424,7 +425,7 @@ pub fn extract_sprites(
                 transform: *transform,
                 flip_x: sprite.flip_x,
                 flip_y: sprite.flip_y,
-                image_handle_id: sprite.image.id(),
+                image_handle_id: sprite.image.id().into(),
                 kind: ExtractedSpriteKind::Single {
                     anchor: anchor.as_vec(),
                     rect,
@@ -487,13 +488,13 @@ pub struct SpriteBatches(HashMap<(RetainedViewEntity, Entity), SpriteBatch>);
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct SpriteBatch {
-    image_handle_id: AssetId<Image>,
+    image_handle_id: Hashed<AssetId<Image>>,
     range: Range<u32>,
 }
 
 #[derive(Resource, Default)]
 pub struct ImageBindGroups {
-    values: HashMap<AssetId<Image>, BindGroup>,
+    values: PreHashMap<AssetId<Image>, BindGroup>,
 }
 
 pub fn queue_sprites(
@@ -656,7 +657,7 @@ pub fn prepare_sprite_image_bind_groups(
             // Images don't have dependencies
             AssetEvent::LoadedWithDependencies { .. } => {}
             AssetEvent::Unused { id } | AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                image_bind_groups.values.remove(id);
+                image_bind_groups.values.remove(&Hashed::new(*id));
             }
         };
     }

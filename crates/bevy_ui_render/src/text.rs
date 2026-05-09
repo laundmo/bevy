@@ -4,6 +4,7 @@ use bevy_color::Alpha;
 use bevy_ecs::prelude::*;
 use bevy_input_focus::InputFocus;
 use bevy_math::{Affine2, Rect, Vec2};
+use bevy_platform::hash::Hashed;
 use bevy_render::{sync_world::TemporaryRenderEntity, Extract};
 use bevy_sprite::BorderRect;
 use bevy_text::{EditableText, TextColor, TextCursorStyle, TextLayoutInfo};
@@ -98,7 +99,7 @@ pub fn extract_text_cursor(
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT_SELECTION,
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: transform * Affine2::from_translation(selection.center()),
                     item: ExtractedUiItem::Node {
@@ -127,7 +128,7 @@ pub fn extract_text_cursor(
                 render_entity: commands.spawn(TemporaryRenderEntity).id(),
                 z_order: stack_index.0 as f32 + stack_z_offsets::TEXT_CURSOR,
                 clip,
-                image: AssetId::default(),
+                image: Hashed::default(),
                 extracted_camera_entity,
                 transform: transform * Affine2::from_translation(cursor_rect.center()),
                 item: ExtractedUiItem::Node {
@@ -220,7 +221,7 @@ pub fn extract_preedit_underlines(
                 render_entity: commands.spawn(TemporaryRenderEntity).id(),
                 z_order: stack_index.0 as f32 + stack_z_offsets::TEXT_STRIKETHROUGH,
                 clip,
-                image: AssetId::default(),
+                image: Hashed::default(),
                 extracted_camera_entity,
                 transform: transform * Affine2::from_translation(rect.center()),
                 item: ExtractedUiItem::Node {

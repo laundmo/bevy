@@ -151,7 +151,7 @@ pub fn prepare_raytracing_scene_bindings(
 
     let mut instance_id = 0;
     for (entity, mesh, material, transform, previous_frame_transform) in &instances_query {
-        let Some(blas) = blas_manager.get(&mesh.id()) else {
+        let Some(blas) = blas_manager.get(&mesh.id().into()) else {
             continue;
         };
         let Some(vertex_slice) = mesh_allocator.mesh_vertex_slice(&mesh.id()) else {

@@ -16,7 +16,10 @@ use bevy_ecs::{
     system::{Res, ResMut},
 };
 use bevy_log::error;
-use bevy_platform::collections::{HashMap, HashSet};
+use bevy_platform::{
+    collections::{HashMap, HashSet},
+    hash::Hashed,
+};
 use bevy_shader::{
     CachedPipelineId, Shader, ShaderCache, ShaderCacheError, ShaderCacheSource, ShaderDefVal,
     ValidateShader,
@@ -446,7 +449,7 @@ impl PipelineCache {
     }
 
     /// Inserts a [`Shader`] into this cache with the provided [`AssetId`].
-    pub fn set_shader(&mut self, id: AssetId<Shader>, shader: Shader) {
+    pub fn set_shader(&mut self, id: Hashed<AssetId<Shader>>, shader: Shader) {
         let mut shader_cache = self.shader_cache.lock().unwrap();
         let pipelines_to_queue = shader_cache.set_shader(id, shader);
         for cached_pipeline in pipelines_to_queue {
@@ -456,7 +459,7 @@ impl PipelineCache {
     }
 
     /// Removes a [`Shader`] from this cache if it exists.
-    pub fn remove_shader(&mut self, shader: AssetId<Shader>) {
+    pub fn remove_shader(&mut self, shader: Hashed<AssetId<Shader>>) {
         let mut shader_cache = self.shader_cache.lock().unwrap();
         let pipelines_to_queue = shader_cache.remove(shader);
         for cached_pipeline in pipelines_to_queue {
@@ -489,7 +492,7 @@ impl PipelineCache {
 
                 let vertex_module = match shader_cache.get(
                     id,
-                    descriptor.vertex.shader.id(),
+                    descriptor.vertex.shader.id().into(),
                     &descriptor.vertex.shader_defs,
                 ) {
                     Ok(module) => module,
@@ -498,7 +501,11 @@ impl PipelineCache {
 
                 let fragment_module = match &descriptor.fragment {
                     Some(fragment) => {
-                        match shader_cache.get(id, fragment.shader.id(), &fragment.shader_defs) {
+                        match shader_cache.get(
+                            id,
+                            fragment.shader.id().into(),
+                            &fragment.shader_defs,
+                        ) {
                             Ok(module) => Some(module),
                             Err(err) => return Err(err),
                         }
@@ -595,11 +602,14 @@ impl PipelineCache {
                 let mut shader_cache = shader_cache.lock().unwrap();
                 let mut layout_cache = layout_cache.lock().unwrap();
 
-                let compute_module =
-                    match shader_cache.get(id, descriptor.shader.id(), &descriptor.shader_defs) {
-                        Ok(module) => module,
-                        Err(err) => return Err(err),
-                    };
+                let compute_module = match shader_cache.get(
+                    id,
+                    descriptor.shader.id().into(),
+                    &descriptor.shader_defs,
+                ) {
+                    Ok(module) => module,
+                    Err(err) => return Err(err),
+                };
 
                 let layout = if descriptor.layout.is_empty() && descriptor.immediate_size == 0 {
                     None
@@ -728,7 +738,7 @@ impl PipelineCache {
             for (id, shader) in shaders.iter() {
                 let mut shader = shader.clone();
                 shader.shader_defs.extend(cache.global_shader_defs.clone());
-                cache.set_shader(id, shader);
+                cache.set_shader(id.into(), shader);
             }
             // Drain events so we don't double-process shaders we just loaded.
             for _ in events.read() {}
@@ -747,10 +757,10 @@ impl PipelineCache {
                         let mut shader = shader.clone();
                         shader.shader_defs.extend(cache.global_shader_defs.clone());
 
-                        cache.set_shader(*id, shader);
+                        cache.set_shader((*id).into(), shader);
                     }
                 }
-                AssetEvent::Removed { id } => cache.remove_shader(*id),
+                AssetEvent::Removed { id } => cache.remove_shader((*id).into()),
                 AssetEvent::Unused { .. } => {}
                 AssetEvent::LoadedWithDependencies { .. } => {
                     // TODO: handle this

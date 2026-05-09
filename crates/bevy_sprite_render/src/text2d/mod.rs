@@ -10,6 +10,7 @@ use bevy_ecs::{
     system::{Commands, Query, ResMut},
 };
 use bevy_math::{Vec2, Vec3};
+use bevy_platform::hash::Hashed;
 use bevy_render::sync_world::TemporaryRenderEntity;
 use bevy_render::Extract;
 use bevy_sprite::{Anchor, Text2dShadow};
@@ -93,7 +94,7 @@ pub fn extract_text2d_sprite(
                 render_entity,
                 transform,
                 color: text_background_color.0.into(),
-                image_handle_id: AssetId::default(),
+                image_handle_id: Hashed::default(),
                 flip_x: false,
                 flip_y: true,
                 kind: ExtractedSpriteKind::Single {
@@ -137,7 +138,7 @@ pub fn extract_text2d_sprite(
                         render_entity,
                         transform: shadow_transform,
                         color,
-                        image_handle_id: atlas_info.texture,
+                        image_handle_id: atlas_info.texture.into(),
                         flip_x: false,
                         flip_y: true,
                         kind: ExtractedSpriteKind::Slices {
@@ -168,7 +169,7 @@ pub fn extract_text2d_sprite(
                         render_entity,
                         transform,
                         color,
-                        image_handle_id: AssetId::default(),
+                        image_handle_id: Hashed::default(),
                         flip_x: false,
                         flip_y: false,
                         kind: ExtractedSpriteKind::Single {
@@ -190,7 +191,7 @@ pub fn extract_text2d_sprite(
                         render_entity,
                         transform,
                         color,
-                        image_handle_id: AssetId::default(),
+                        image_handle_id: Hashed::default(),
                         flip_x: false,
                         flip_y: false,
                         kind: ExtractedSpriteKind::Single {
@@ -248,7 +249,7 @@ pub fn extract_text2d_sprite(
                     render_entity,
                     transform,
                     color,
-                    image_handle_id: atlas_info.texture,
+                    image_handle_id: atlas_info.texture.into(),
                     flip_x: false,
                     flip_y: true,
                     kind: ExtractedSpriteKind::Slices {
@@ -289,7 +290,7 @@ pub fn extract_text2d_sprite(
                     render_entity,
                     transform,
                     color,
-                    image_handle_id: AssetId::default(),
+                    image_handle_id: Hashed::default(),
                     flip_x: false,
                     flip_y: false,
                     kind: ExtractedSpriteKind::Single {
@@ -317,7 +318,7 @@ pub fn extract_text2d_sprite(
                     render_entity,
                     transform,
                     color,
-                    image_handle_id: AssetId::default(),
+                    image_handle_id: Hashed::default(),
                     flip_x: false,
                     flip_y: false,
                     kind: ExtractedSpriteKind::Single {

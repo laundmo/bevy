@@ -26,7 +26,7 @@ pub struct MeshletMeshManager {
     pub meshlets: PersistentGpuBuffer<Arc<[Meshlet]>>,
     pub meshlet_cull_data: PersistentGpuBuffer<Arc<[MeshletCullData]>>,
     meshlet_mesh_slices:
-        HashMap<AssetId<MeshletMesh>, ([Range<BufferAddress>; 7], MeshletAabb, u32)>,
+        PreHashMap<AssetId<MeshletMesh>, ([Range<BufferAddress>; 7], MeshletAabb, u32)>,
 }
 
 pub fn init_meshlet_mesh_manager(mut commands: Commands, render_device: Res<RenderDevice>) {

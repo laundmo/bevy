@@ -398,7 +398,7 @@ pub fn extract_gradients(
                                 NodeType::Rect | NodeType::Inverted => stack_z_offsets::GRADIENT,
                                 NodeType::Border(_) => stack_z_offsets::BORDER_GRADIENT,
                             },
-                        image: AssetId::default(),
+                        image: Hashed::default(),
                         clip: clip.map(|clip| clip.clip),
                         extracted_camera_entity,
                         transform: transform.into(),

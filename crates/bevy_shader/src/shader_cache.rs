@@ -1,7 +1,11 @@
 use crate::shader::*;
 use alloc::sync::Arc;
 use bevy_asset::AssetId;
-use bevy_platform::collections::{hash_map::EntryRef, HashMap, HashSet};
+use bevy_platform::{
+    collections::{hash_map::EntryRef, HashMap, HashSet},
+    hash::Hashed,
+};
+use bevy_utils::PreHashMap;
 use core::hash::Hash;
 use thiserror::Error;
 use tracing::debug;
@@ -41,8 +45,8 @@ pub type CachedPipelineId = usize;
 struct ShaderData<ShaderModule> {
     pipelines: HashSet<CachedPipelineId>,
     processed_shaders: HashMap<Box<[ShaderDefVal]>, Arc<ShaderModule>>,
-    resolved_imports: HashMap<ShaderImport, AssetId<Shader>>,
-    dependents: HashSet<AssetId<Shader>>,
+    resolved_imports: HashMap<ShaderImport, Hashed<AssetId<Shader>>>,
+    dependents: HashSet<Hashed<AssetId<Shader>>>,
 }
 
 impl<T> Default for ShaderData<T> {
@@ -65,17 +69,17 @@ impl<T> Default for ShaderData<T> {
 /// shader source into a usable compiled module is left to the renderer.
 pub struct ShaderCache<ShaderModule, RenderDevice> {
     device: RenderDevice,
-    data: HashMap<AssetId<Shader>, ShaderData<ShaderModule>>,
+    data: PreHashMap<AssetId<Shader>, ShaderData<ShaderModule>>,
     load_module: fn(
         &RenderDevice,
         ShaderCacheSource,
         &ValidateShader,
     ) -> Result<ShaderModule, ShaderCacheError>,
     #[cfg(feature = "shader_format_wesl")]
-    module_path_to_asset_id: HashMap<wesl::syntax::ModulePath, AssetId<Shader>>,
-    shaders: HashMap<AssetId<Shader>, Shader>,
-    import_path_shaders: HashMap<ShaderImport, AssetId<Shader>>,
-    waiting_on_import: HashMap<ShaderImport, Vec<AssetId<Shader>>>,
+    module_path_to_asset_id: HashMap<wesl::syntax::ModulePath, Hashed<AssetId<Shader>>>,
+    shaders: PreHashMap<AssetId<Shader>, Shader>,
+    import_path_shaders: HashMap<ShaderImport, Hashed<AssetId<Shader>>>,
+    waiting_on_import: HashMap<ShaderImport, Vec<Hashed<AssetId<Shader>>>>,
     // The naga composer is only public for providing error messages and should not be touched.
     #[doc(hidden)]
     pub composer: naga_oil::compose::Composer,
@@ -151,8 +155,8 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
 
     fn add_import_to_composer(
         composer: &mut naga_oil::compose::Composer,
-        import_path_shaders: &HashMap<ShaderImport, AssetId<Shader>>,
-        shaders: &HashMap<AssetId<Shader>, Shader>,
+        import_path_shaders: &HashMap<ShaderImport, Hashed<AssetId<Shader>>>,
+        shaders: &PreHashMap<AssetId<Shader>, Shader>,
         import: &ShaderImport,
     ) -> Result<(), ShaderCacheError> {
         // Early out if we've already imported this module
@@ -192,7 +196,7 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
     pub fn get(
         &mut self,
         pipeline: CachedPipelineId,
-        id: AssetId<Shader>,
+        id: Hashed<AssetId<Shader>>,
         shader_defs: &[ShaderDefVal],
     ) -> Result<Arc<ShaderModule>, ShaderCacheError> {
         let shader = self
@@ -222,7 +226,7 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
             EntryRef::Vacant(entry) => {
                 debug!(
                     "processing shader {}, with shader defs {:?}",
-                    id, shader_defs
+                    *id, shader_defs
                 );
                 let shader_source = match &shader.source {
                     Source::SpirV(data) => ShaderCacheSource::SpirV(data.as_ref()),
@@ -330,7 +334,7 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
         Ok(module.clone())
     }
 
-    fn clear(&mut self, id: AssetId<Shader>) -> Vec<CachedPipelineId> {
+    fn clear(&mut self, id: Hashed<AssetId<Shader>>) -> Vec<CachedPipelineId> {
         let mut shaders_to_clear = vec![id];
         let mut pipelines_to_queue = Vec::new();
         while let Some(handle) = shaders_to_clear.pop() {
@@ -353,7 +357,11 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
     ///
     /// Returns a vec of which cached pipelines depended on it
     /// (directly or indirectly via a shader import) and thus must be recompiled.
-    pub fn set_shader(&mut self, id: AssetId<Shader>, shader: Shader) -> Vec<CachedPipelineId> {
+    pub fn set_shader(
+        &mut self,
+        id: Hashed<AssetId<Shader>>,
+        shader: Shader,
+    ) -> Vec<CachedPipelineId> {
         let pipelines_to_queue = self.clear(id);
         let path = &shader.import_path;
         self.import_path_shaders.insert(path.clone(), id);
@@ -397,7 +405,7 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
     ///
     /// Returns a vec of which cached pipelines depended on it
     /// (directly or indirectly via a shader import) and thus must be recompiled.
-    pub fn remove(&mut self, id: AssetId<Shader>) -> Vec<CachedPipelineId> {
+    pub fn remove(&mut self, id: Hashed<AssetId<Shader>>) -> Vec<CachedPipelineId> {
         let pipelines_to_queue = self.clear(id);
         if let Some(shader) = self.shaders.remove(&id) {
             self.import_path_shaders.remove(&shader.import_path);
@@ -410,8 +418,8 @@ impl<ShaderModule, RenderDevice> ShaderCache<ShaderModule, RenderDevice> {
 /// A Wesl import resolver. Maps module paths to actual Wesl shader source.
 #[cfg(feature = "shader_format_wesl")]
 pub struct ShaderResolver<'a> {
-    module_path_to_asset_id: &'a HashMap<wesl::syntax::ModulePath, AssetId<Shader>>,
-    shaders: &'a HashMap<AssetId<Shader>, Shader>,
+    module_path_to_asset_id: &'a HashMap<wesl::syntax::ModulePath, Hashed<AssetId<Shader>>>,
+    shaders: &'a PreHashMap<AssetId<Shader>, Shader>,
 }
 
 #[cfg(feature = "shader_format_wesl")]
@@ -420,8 +428,8 @@ impl<'a> ShaderResolver<'a> {
     /// and map of shader asset ids to shader source. This resolver is not meant to be
     /// long living.
     pub fn new(
-        module_path_to_asset_id: &'a HashMap<wesl::syntax::ModulePath, AssetId<Shader>>,
-        shaders: &'a HashMap<AssetId<Shader>, Shader>,
+        module_path_to_asset_id: &'a HashMap<wesl::syntax::ModulePath, Hashed<AssetId<Shader>>>,
+        shaders: &'a PreHashMap<AssetId<Shader>, Shader>,
     ) -> Self {
         Self {
             module_path_to_asset_id,
@@ -458,7 +466,7 @@ pub enum ShaderCacheError {
     #[error(
         "Pipeline could not be compiled because the following shader could not be loaded: {0:?}"
     )]
-    ShaderNotLoaded(AssetId<Shader>),
+    ShaderNotLoaded(Hashed<AssetId<Shader>>),
     #[error(transparent)]
     ProcessShaderError(#[from] Box<naga_oil::compose::ComposerError>),
     #[error("Shader import not yet available.")]

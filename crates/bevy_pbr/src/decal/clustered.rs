@@ -34,7 +34,7 @@ use bevy_ecs::{
 use bevy_image::Image;
 use bevy_light::{ClusteredDecal, DirectionalLightTexture, PointLightTexture, SpotLightTexture};
 use bevy_math::{Mat4, Vec3};
-use bevy_platform::collections::HashMap;
+use bevy_platform::{collections::HashMap, hash::Hashed};
 use bevy_render::{
     render_asset::RenderAssets,
     render_resource::{
@@ -50,6 +50,7 @@ use bevy_render::{
 };
 use bevy_shader::load_shader_library;
 use bevy_transform::components::GlobalTransform;
+use bevy_utils::PreHashMap;
 use bytemuck::{Pod, Zeroable};
 
 use crate::{binding_arrays_are_usable, prepare_lights, GlobalClusterableObjectMeta};
@@ -69,11 +70,11 @@ pub struct RenderClusteredDecals {
     /// Maps an index in the shader binding array to the associated decal image.
     ///
     /// The `texture_to_binding_index` field holds the inverse mapping.
-    pub binding_index_to_textures: Vec<AssetId<Image>>,
+    pub binding_index_to_textures: Vec<Hashed<AssetId<Image>>>,
     /// Maps a decal image to the shader binding array.
     ///
     /// [`Self::binding_index_to_textures`] holds the inverse mapping.
-    texture_to_binding_index: HashMap<AssetId<Image>, i32>,
+    texture_to_binding_index: PreHashMap<AssetId<Image>, i32>,
     /// The information concerning each decal that we provide to the shader.
     decals: Vec<RenderClusteredDecal>,
     /// Maps the [`bevy_render::sync_world::RenderEntity`] of each decal to the
@@ -101,7 +102,7 @@ impl RenderClusteredDecals {
         tag: u32,
     ) {
         let image_indices = images.map(|maybe_image_id| match maybe_image_id {
-            Some(ref image_id) => self.get_or_insert_image(image_id),
+            Some(image_id) => self.get_or_insert_image(image_id.into()),
             None => -1,
         });
         let decal_index = self.decals.len();
@@ -510,13 +511,13 @@ impl<'a> RenderViewClusteredDecalBindGroupEntries<'a> {
 impl RenderClusteredDecals {
     /// Returns the index of the given image in the decal texture binding array,
     /// adding it to the list if necessary.
-    fn get_or_insert_image(&mut self, image_id: &AssetId<Image>) -> i32 {
+    fn get_or_insert_image(&mut self, image_id: Hashed<AssetId<Image>>) -> i32 {
         *self
             .texture_to_binding_index
-            .entry(*image_id)
+            .entry(image_id)
             .or_insert_with(|| {
                 let index = self.binding_index_to_textures.len() as i32;
-                self.binding_index_to_textures.push(*image_id);
+                self.binding_index_to_textures.push(image_id);
                 index
             })
     }

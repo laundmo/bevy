@@ -12,6 +12,7 @@ use bevy_ecs::{
     system::{Res, ResMut},
     world::{FromWorld, World},
 };
+use bevy_platform::hash::Hashed;
 use wgpu::{BufferUsages, DownlevelFlags, COPY_BUFFER_ALIGNMENT};
 
 #[cfg(feature = "morph")]
@@ -134,7 +135,7 @@ impl Slab<MeshSlabItem> {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MeshAllocationKey {
     /// The ID of the mesh asset.
-    pub mesh_id: AssetId<Mesh>,
+    pub mesh_id: Hashed<AssetId<Mesh>>,
     /// The type of data: vertex data, index data, or morph data.
     pub class: ElementClass,
 }
@@ -142,8 +143,11 @@ pub struct MeshAllocationKey {
 impl MeshAllocationKey {
     /// Creates a new [`MeshAllocationKey`] for the given mesh asset ID and
     /// class.
-    pub fn new(mesh_id: AssetId<Mesh>, class: ElementClass) -> Self {
-        Self { mesh_id, class }
+    pub fn new(mesh_id: impl Into<Hashed<AssetId<Mesh>>>, class: ElementClass) -> Self {
+        Self {
+            mesh_id: mesh_id.into(),
+            class,
+        }
     }
 }
 

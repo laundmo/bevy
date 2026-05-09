@@ -2,13 +2,14 @@ use bevy_app::prelude::*;
 use bevy_asset::{Asset, AssetApp as _, AssetId, Assets, Handle};
 use bevy_ecs::template::FromTemplate;
 use bevy_math::{Rect, URect, UVec2};
-use bevy_platform::collections::HashMap;
+use bevy_platform::hash::Hashed;
 #[cfg(not(feature = "bevy_reflect"))]
 use bevy_reflect::TypePath;
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::{std_traits::ReflectDefault, Reflect};
 #[cfg(feature = "serialize")]
 use bevy_reflect::{ReflectDeserialize, ReflectSerialize};
+use bevy_utils::PreHashMap;
 
 use crate::Image;
 
@@ -32,13 +33,13 @@ impl Plugin for TextureAtlasPlugin {
 #[derive(Debug)]
 pub struct TextureAtlasSources {
     /// Maps from a specific image handle to the index in `textures` where they can be found.
-    pub texture_ids: HashMap<AssetId<Image>, usize>,
+    pub texture_ids: PreHashMap<AssetId<Image>, usize>,
 }
 
 impl TextureAtlasSources {
     /// Retrieves the texture *section* index of the given `texture` handle.
     pub fn texture_index(&self, texture: impl Into<AssetId<Image>>) -> Option<usize> {
-        let id = texture.into();
+        let id: Hashed<AssetId<Image>> = texture.into().into();
         self.texture_ids.get(&id).cloned()
     }
 

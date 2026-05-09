@@ -20,6 +20,7 @@ use bevy_ecs::system::ResMut;
 use bevy_math::Affine2;
 use bevy_math::Rect;
 use bevy_math::Vec2;
+use bevy_platform::hash::Hashed;
 use bevy_reflect::Reflect;
 use bevy_render::sync_world::TemporaryRenderEntity;
 use bevy_render::Extract;
@@ -224,7 +225,7 @@ pub fn extract_debug_overlay(
                 clip: maybe_clip
                     .filter(|_| !debug_options.show_clipped)
                     .map(|clip| clip.clip),
-                image: AssetId::default(),
+                image: Hashed::default(),
                 extracted_camera_entity,
                 transform: transform * Affine2::from_translation(rect.center()),
                 item: ExtractedUiItem::Node {

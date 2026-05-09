@@ -307,7 +307,7 @@ fn prepare_screenshots(
                 );
             }
             NormalizedRenderTarget::Image(image) => {
-                let Some(gpu_image) = images.get(&image.handle) else {
+                let Some(gpu_image) = images.get(image.handle.id()) else {
                     warn!("Unknown image for screenshot, skipping: {:?}", image);
                     continue;
                 };
@@ -530,7 +530,7 @@ pub(crate) fn submit_screenshot_commands(world: &World, encoder: &mut CommandEnc
                 );
             }
             NormalizedRenderTarget::Image(image) => {
-                let Some(gpu_image) = gpu_images.get(&image.handle) else {
+                let Some(gpu_image) = gpu_images.get(image.handle.id()) else {
                     warn!("Unknown image for screenshot, skipping: {:?}", image);
                     continue;
                 };

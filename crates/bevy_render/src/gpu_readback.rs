@@ -261,7 +261,7 @@ fn prepare_buffers(
     for (entity, readback) in handles.iter() {
         match readback {
             Readback::Texture(image) => {
-                if let Some(gpu_image) = gpu_images.get(image)
+                if let Some(gpu_image) = gpu_images.get(image.id())
                     && let Ok(pixel_size) = gpu_image.texture_descriptor.format.pixel_size()
                 {
                     let layout = layout_data(
@@ -291,7 +291,7 @@ fn prepare_buffers(
                 buffer,
                 start_offset_and_size,
             } => {
-                if let Some(ssbo) = ssbos.get(buffer) {
+                if let Some(ssbo) = ssbos.get(buffer.id()) {
                     let full_size = ssbo.buffer.size();
                     let size = start_offset_and_size
                         .map(|(start, size)| {

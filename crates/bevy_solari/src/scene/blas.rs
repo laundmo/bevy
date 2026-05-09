@@ -5,7 +5,7 @@ use bevy_ecs::{
     system::{Res, ResMut},
 };
 use bevy_mesh::{Indices, Mesh};
-use bevy_platform::collections::HashMap;
+use bevy_platform::hash::Hashed;
 use bevy_render::{
     mesh::{
         allocator::{MeshAllocator, MeshBufferSlice},
@@ -15,6 +15,7 @@ use bevy_render::{
     render_resource::*,
     renderer::{RenderDevice, RenderQueue},
 };
+use bevy_utils::PreHashMap;
 
 /// After compacting this many vertices worth of meshes per frame, no further BLAS will be compacted.
 /// Lower this number to distribute the work across more frames.
@@ -22,12 +23,12 @@ const MAX_COMPACTION_VERTICES_PER_FRAME: u32 = 400_000;
 
 #[derive(Resource, Default)]
 pub struct BlasManager {
-    blas: HashMap<AssetId<Mesh>, Blas>,
-    compaction_queue: VecDeque<(AssetId<Mesh>, u32, bool)>,
+    blas: PreHashMap<AssetId<Mesh>, Blas>,
+    compaction_queue: VecDeque<(Hashed<AssetId<Mesh>>, u32, bool)>,
 }
 
 impl BlasManager {
-    pub fn get(&self, mesh: &AssetId<Mesh>) -> Option<&Blas> {
+    pub fn get(&self, mesh: &Hashed<AssetId<Mesh>>) -> Option<&Blas> {
         self.blas.get(mesh)
     }
 }

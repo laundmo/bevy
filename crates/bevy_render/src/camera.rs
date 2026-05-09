@@ -235,7 +235,7 @@ impl NormalizedRenderTargetExt for NormalizedRenderTarget {
                 .get(&window_ref.entity())
                 .and_then(|window| window.swap_chain_texture_view.as_ref()),
             NormalizedRenderTarget::Image(image_target) => images
-                .get(&image_target.handle)
+                .get(image_target.handle.id())
                 .map(|image| &image.texture_view),
             NormalizedRenderTarget::TextureView(id) => {
                 manual_texture_views.get(id).map(|tex| &tex.texture_view)
@@ -255,9 +255,9 @@ impl NormalizedRenderTargetExt for NormalizedRenderTarget {
             NormalizedRenderTarget::Window(window_ref) => windows
                 .get(&window_ref.entity())
                 .and_then(|window| window.swap_chain_texture_view_format),
-            NormalizedRenderTarget::Image(image_target) => {
-                images.get(&image_target.handle).map(GpuImage::view_format)
-            }
+            NormalizedRenderTarget::Image(image_target) => images
+                .get(image_target.handle.id())
+                .map(GpuImage::view_format),
             NormalizedRenderTarget::TextureView(id) => {
                 manual_texture_views.get(id).map(|tex| tex.view_format)
             }

@@ -21,6 +21,7 @@ mod debug_overlay;
 
 use bevy_camera::visibility::InheritedVisibility;
 use bevy_camera::{Camera, Camera2d, Camera3d, RenderTarget};
+use bevy_platform::hash::Hashed;
 use bevy_reflect::prelude::ReflectDefault;
 use bevy_reflect::Reflect;
 use bevy_render::camera::{extract_cameras, CameraMainPassTextureFormats};
@@ -59,6 +60,7 @@ use bevy_render::{
     Extract, ExtractSchedule, GpuResourceAppExt, Render, RenderApp, RenderStartup, RenderSystems,
 };
 use bevy_sprite::BorderRect;
+use bevy_utils::PreHashMap;
 #[cfg(feature = "bevy_ui_debug")]
 pub use debug_overlay::{GlobalUiDebugOptions, UiDebugOptions};
 
@@ -326,7 +328,7 @@ impl<'w, 's> UiCameraMapper<'w, 's> {
 
 pub struct ExtractedUiNode {
     pub z_order: f32,
-    pub image: AssetId<Image>,
+    pub image: Hashed<AssetId<Image>>,
     pub clip: Option<Rect>,
     /// Render world entity of the extracted camera corresponding to this node's target camera.
     pub extracted_camera_entity: Entity,
@@ -436,7 +438,7 @@ pub fn extract_uinode_background_colors(
                 render_entity: commands.spawn(TemporaryRenderEntity).id(),
                 z_order: stack_index.0 as f32 + stack_z_offsets::BACKGROUND_COLOR,
                 clip: clip.map(|clip| clip.clip),
-                image: AssetId::default(),
+                image: Hashed::default(),
                 extracted_camera_entity,
                 transform: transform.into(),
                 item: ExtractedUiItem::Node {
@@ -463,7 +465,7 @@ pub fn extract_uinode_background_colors(
                 render_entity: commands.spawn(TemporaryRenderEntity).id(),
                 z_order: stack_index.0 as f32 + stack_z_offsets::BACKGROUND_COLOR,
                 clip: clip.map(|clip| clip.clip),
-                image: AssetId::default(),
+                image: Hashed::default(),
                 extracted_camera_entity,
                 transform: transform.into(),
                 item: ExtractedUiItem::Node {
@@ -580,7 +582,7 @@ pub fn extract_uinode_images(
             z_order: stack_index.0 as f32 + stack_z_offsets::IMAGE,
             render_entity: commands.spawn(TemporaryRenderEntity).id(),
             clip: clip.map(|clip| clip.clip),
-            image: image.image.id(),
+            image: image.image.id().into(),
             extracted_camera_entity,
             transform: Affine2::from(*transform) * Affine2::from_translation(visual_box.center()),
             item: ExtractedUiItem::Node {
@@ -616,7 +618,7 @@ pub fn extract_uinode_borders(
     >,
     camera_map: Extract<UiCameraMap>,
 ) {
-    let image = AssetId::<Image>::default();
+    let image = Hashed::new(AssetId::<Image>::default());
     let mut camera_mapper = camera_map.get_mapper();
 
     for (
@@ -931,7 +933,7 @@ pub fn extract_viewport_nodes(
             z_order: stack_index.0 as f32 + stack_z_offsets::IMAGE,
             render_entity: commands.spawn(TemporaryRenderEntity).id(),
             clip: clip.map(|clip| clip.clip),
-            image: image.id(),
+            image: image.id().into(),
             extracted_camera_entity,
             transform: transform.into(),
             item: ExtractedUiItem::Node {
@@ -1080,7 +1082,7 @@ pub fn extract_text_sections(
                 extracted_uinodes.uinodes.push(ExtractedUiNode {
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
-                    image: atlas_info.texture,
+                    image: atlas_info.texture.into(),
                     clip,
                     extracted_camera_entity,
                     item: ExtractedUiItem::Glyphs { range: start..end },
@@ -1184,7 +1186,7 @@ pub fn extract_text_shadows(
                     transform: node_transform,
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
-                    image: atlas_info.texture,
+                    image: atlas_info.texture.into(),
                     clip,
                     extracted_camera_entity,
                     item: ExtractedUiItem::Glyphs { range: start..end },
@@ -1214,7 +1216,7 @@ pub fn extract_text_shadows(
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: node_transform
                         * Affine2::from_translation(run.strikethrough_position()),
@@ -1240,7 +1242,7 @@ pub fn extract_text_shadows(
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: node_transform * Affine2::from_translation(run.underline_position()),
                     item: ExtractedUiItem::Node {
@@ -1352,7 +1354,7 @@ pub fn extract_text_decorations(
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: transform * Affine2::from_translation(run.bounds.center()),
                     item: ExtractedUiItem::Node {
@@ -1382,7 +1384,7 @@ pub fn extract_text_decorations(
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT_STRIKETHROUGH,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: transform * Affine2::from_translation(run.strikethrough_position()),
                     item: ExtractedUiItem::Node {
@@ -1412,7 +1414,7 @@ pub fn extract_text_decorations(
                     z_order: stack_index.0 as f32 + stack_z_offsets::TEXT_STRIKETHROUGH,
                     render_entity: commands.spawn(TemporaryRenderEntity).id(),
                     clip,
-                    image: AssetId::default(),
+                    image: Hashed::default(),
                     extracted_camera_entity,
                     transform: transform * Affine2::from_translation(run.underline_position()),
                     item: ExtractedUiItem::Node {
@@ -1485,7 +1487,7 @@ pub(crate) const QUAD_INDICES: [usize; 6] = [0, 2, 3, 0, 1, 2];
 #[derive(Component)]
 pub struct UiBatch {
     pub range: Range<u32>,
-    pub image: AssetId<Image>,
+    pub image: Hashed<AssetId<Image>>,
 }
 
 /// The values here should match the values for the constants in `ui.wgsl`
@@ -1569,7 +1571,7 @@ pub fn queue_uinodes(
 
 #[derive(Resource, Default)]
 pub struct ImageNodeBindGroups {
-    pub values: HashMap<AssetId<Image>, BindGroup>,
+    pub values: PreHashMap<AssetId<Image>, BindGroup>,
 }
 
 pub fn prepare_uinodes(
@@ -1595,7 +1597,7 @@ pub fn prepare_uinodes(
             // Images don't have dependencies
             AssetEvent::LoadedWithDependencies { .. } => {}
             AssetEvent::Modified { id } | AssetEvent::Removed { id } => {
-                image_bind_groups.values.remove(id);
+                image_bind_groups.values.remove(&Hashed::new(*id));
             }
         };
     }
@@ -1634,8 +1636,8 @@ pub fn prepare_uinodes(
 
                 if batch_image_handle.is_none()
                     || existing_batch.is_none()
-                    || (batch_image_handle != Some(AssetId::default())
-                        && extracted_uinode.image != AssetId::default()
+                    || (batch_image_handle != Some(Hashed::default())
+                        && extracted_uinode.image != Hashed::default()
                         && batch_image_handle != Some(extracted_uinode.image))
                 {
                     if let Some(gpu_image) = gpu_images.get(extracted_uinode.image) {
@@ -1668,8 +1670,8 @@ pub fn prepare_uinodes(
                     } else {
                         continue;
                     }
-                } else if batch_image_handle == Some(AssetId::default())
-                    && extracted_uinode.image != AssetId::default()
+                } else if batch_image_handle == Some(Hashed::default())
+                    && extracted_uinode.image != Hashed::default()
                 {
                     if let Some(ref mut existing_batch) = existing_batch
                         && let Some(gpu_image) = gpu_images.get(extracted_uinode.image)
@@ -1706,7 +1708,7 @@ pub fn prepare_uinodes(
                         rect,
                         color,
                     } => {
-                        let mut flags = if extracted_uinode.image != AssetId::default() {
+                        let mut flags = if extracted_uinode.image != Hashed::default() {
                             shader_flags::TEXTURED
                         } else {
                             shader_flags::UNTEXTURED

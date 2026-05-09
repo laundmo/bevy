@@ -204,7 +204,7 @@ impl RenderAsset for RenderMesh {
             _render_morph_targets_allocator.allocate(
                 _render_device,
                 _render_queue,
-                _mesh_id,
+                _mesh_id.into(),
                 morph_targets,
                 mesh.count_vertices(),
             );
@@ -228,6 +228,6 @@ impl RenderAsset for RenderMesh {
     ) {
         // Free the morph target images if necessary.
         #[cfg(feature = "morph")]
-        _render_morph_targets_allocator.free(_mesh_id);
+        _render_morph_targets_allocator.free(_mesh_id.into());
     }
 }

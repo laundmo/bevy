@@ -2,7 +2,7 @@ use core::{any::TypeId, hash::Hash};
 
 use bevy_platform::{
     collections::HashMap,
-    hash::{Hashed, NoOpHash, PassHash},
+    hash::{FixedHasher, Hashed, NoOpHash, PassHash},
 };
 use indexmap::map::IndexMap;
 

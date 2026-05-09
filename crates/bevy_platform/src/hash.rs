@@ -52,6 +52,14 @@ impl<V: Hash, H: BuildHasher + Default> Hashed<V, H> {
         }
     }
 
+    /// Create a new Hashed with the default value
+    pub fn default() -> Self
+    where
+        V: Default,
+    {
+        Self::new(V::default())
+    }
+
     /// Mutates the current value and re-computes the hash.
     pub fn mutate(&mut self, func: impl FnOnce(&mut V)) {
         func(&mut self.value);
