@@ -561,3 +561,21 @@ impl<F: FnOnce(&mut ResolveContext, &mut ResolvedScene) + Send + Sync + 'static>
         Ok(())
     }
 }
+
+/// Helper trait which is implemented for every type that is [`Scene`] and just returns it unmodified.
+///
+/// This works around <https://github.com/rust-lang/rust/issues/141258>
+/// (trait errors don't show which tuple item fails to implement a trait)
+pub trait ToScene {
+    /// Takes self and returns a [`Scene`]
+    fn to_scene(self) -> impl Scene;
+}
+impl<T> ToScene for T
+where
+    T: Scene,
+{
+    #[inline]
+    fn to_scene(self) -> impl Scene {
+        self
+    }
+}

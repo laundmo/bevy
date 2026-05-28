@@ -5,9 +5,12 @@ use crate::bsn::types::{
 };
 use bevy_macro_utils::{fq_std::FQDefault, path_to_string};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
-use syn::{parse::Parse, punctuated::Punctuated, ExprTuple, Ident, Index, Lit, Member, Path};
+use syn::{
+    parse::Parse, punctuated::Punctuated, spanned::Spanned, ExprTuple, Ident, Index, Lit, Member,
+    Path,
+};
 
 /// Tracks named entity references and assigns them unique, sequential indices
 /// during the code generation process.
@@ -95,6 +98,7 @@ impl BsnTokenStream for BsnRoot {
         // e.g. when typing the name of a field but no value yet.
         quote! {
             #bevy_scene::SceneScope({
+                use #bevy_scene::ToScene;
                 #(#hoisted_exprs)*
                 let _res = #tokens;
                 #(#errors)*
@@ -117,6 +121,7 @@ impl BsnTokenStream for BsnListRoot {
         // e.g. when typing the name of a field but no value yet.
         quote! {
             {
+                use #bevy_scene::ToScene;
                 #(#hoisted_exprs)*
                 let _res = #bevy_scene::SceneListScope(#tokens);
                 #(#errors)*
@@ -320,8 +325,11 @@ impl BsnScene {
                     (<#path as #bevy_scene::SceneComponent>::scene(#props), #from_template_patch)
                 }})
             }
-            BsnScene::Expression(tokens) => Ok(quote! {
-                #tokens
+            BsnScene::Expression(tokens) => Ok({
+                let span = proc_macro2::Span::from(tokens.span().unwrap().start());
+                quote_spanned! {span=>
+                    {#tokens}.to_scene()
+                }
             }),
         }
     }
@@ -669,7 +677,8 @@ impl BsnSceneFn {
         let bevy_scene = ctx.bevy_scene;
         let args = self.args.to_tokens(ctx);
         let path = self.path.clone();
-        quote! {#bevy_scene::SceneScope(#path(#args))}
+        let span = proc_macro2::Span::from(path.span().unwrap().start());
+        quote_spanned! {span=> #bevy_scene::SceneScope({#path(#args)}.to_scene())}
     }
 }
 
