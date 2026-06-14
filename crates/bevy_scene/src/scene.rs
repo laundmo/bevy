@@ -3,13 +3,15 @@ use bevy_asset::{Asset, AssetPath, AssetServer, Assets};
 use bevy_ecs::{
     bundle::Bundle,
     component::Component,
+    entity::Entity,
     error::Result,
     event::EntityEvent,
     name::Name,
     relationship::Relationship,
     system::IntoObserverSystem,
     template::{
-        FnBundleTemplate, FnTemplate, FromTemplate, SceneEntityReference, Template, TemplateContext,
+        bundle_template, EntityTemplate, FnBundleTemplate, FnTemplate, FromTemplate,
+        SceneEntityReference, Template, TemplateContext,
     },
 };
 use core::{any::TypeId, marker::PhantomData};
@@ -636,4 +638,29 @@ impl<F: FnOnce(&mut ResolveContext, &mut ResolvedScene) + Send + Sync + 'static>
         (self.0)(context, scene);
         Ok(())
     }
+}
+
+/// A [`Scene`] which inserts a [`Observer`] thats built by a closure to which the resolved [`Entity`] of a [`EntityTemplate`] is passed.
+///
+/// Allows for observers to directly reference a #Named entity reference
+/// ```ignore
+/// entity_on(#Root, |entity| {
+///     move |on: On<Heal>|{
+///         dbg!(entity);
+///     }
+/// })
+/// ```
+pub fn entity_on<I: IntoObserverSystem<E, B, M> + Clone, E: EntityEvent, B: Bundle, M: 'static>(
+    entity: EntityTemplate,
+    make_observer: impl FnMut(Entity) -> I + Clone + Send + Sync + 'static,
+) -> impl Scene {
+    SceneFunction(move |_, resolved| {
+        resolved.push_bundle_template(bundle_template(move |context| {
+            let entity = entity.build_template(context).unwrap();
+            on((make_observer.clone())(entity))
+                .build_template(context)
+                .unwrap();
+            Ok(())
+        }));
+    })
 }

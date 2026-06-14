@@ -1086,7 +1086,7 @@ impl Plugin for ScenePlugin {
 
 #[cfg(test)]
 mod tests {
-    use crate::{self as bevy_scene, ScenePlugin};
+    use crate::{self as bevy_scene, entity_on, SceneFunction, ScenePlugin};
     use crate::{prelude::*, ScenePatch};
     use alloc::sync::Arc;
     use bevy_app::{App, TaskPoolPlugin};
@@ -1097,7 +1097,8 @@ mod tests {
     use bevy_ecs::name::Name;
     use bevy_ecs::prelude::*;
     use bevy_ecs::relationship::Relationship;
-    use bevy_ecs::system::{system_value, SystemHandle};
+    use bevy_ecs::system::{system_value, IntoObserverSystem, SystemHandle};
+    use bevy_ecs::template::{bundle_template, EntityTemplate, FnTemplate, SceneEntityReference};
     use bevy_ecs::world::DeferredWorld;
     use bevy_reflect::TypePath;
     use bevy_scene_macros::SceneComponent;
@@ -2922,5 +2923,28 @@ mod tests {
             })
             .unwrap();
         assert!(entity.get::<Foo>().is_some());
+    }
+    #[test]
+    fn pass_entity_to_observer() {
+        let mut app = test_app();
+        let world = app.world_mut();
+        #[derive(EntityEvent)]
+        struct Heal(Entity);
+
+        let t = bsn! {
+            #Root
+            Children [
+                entity_on(#Root, |entity| {
+                    move |on: On<Heal>|{
+                        dbg!(entity);
+                    }
+                })
+            ]
+        };
+
+        let root = world.spawn_scene(t).unwrap();
+        let child = *root.get::<Children>().unwrap().first().unwrap();
+        world.trigger(Heal(child));
+        dbg!("output works");
     }
 }
