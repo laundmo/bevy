@@ -8,7 +8,9 @@ use bevy_ecs::{
     name::Name,
     relationship::Relationship,
     system::IntoObserverSystem,
-    template::{FnTemplate, FromTemplate, SceneEntityReference, Template, TemplateContext},
+    template::{
+        FnBundleTemplate, FnTemplate, FromTemplate, SceneEntityReference, Template, TemplateContext,
+    },
 };
 use core::{any::TypeId, marker::PhantomData};
 use thiserror::Error;
@@ -434,6 +436,18 @@ impl<F: (Fn(&mut TemplateContext) -> Result<O>) + Clone + Send + Sync + 'static,
         scene: &mut ResolvedScene,
     ) -> Result<(), ResolveSceneError> {
         scene.push_template(FnTemplate(self.0));
+        Ok(())
+    }
+}
+impl<F: (Fn(&mut TemplateContext) -> Result<O>) + Clone + Send + Sync + 'static, O: Bundle> Scene
+    for FnBundleTemplate<F, O>
+{
+    fn resolve(
+        self,
+        _context: &mut ResolveContext,
+        scene: &mut ResolvedScene,
+    ) -> Result<(), ResolveSceneError> {
+        scene.push_bundle_template(FnBundleTemplate(self.0));
         Ok(())
     }
 }

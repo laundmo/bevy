@@ -4,7 +4,8 @@ pub use bevy_ecs_macros::FromTemplate;
 use core::{hash::Hash, ops::Deref};
 
 use crate::{
-    component::Mutable,
+    bundle::Bundle,
+    component::{Component, Mutable},
     entity::Entity,
     error::{BevyError, Result},
     resource::Resource,
@@ -477,9 +478,9 @@ impl FromTemplate for Entity {
 
 /// A [`Template`] driven by a function that returns an output. This is used to create "free floating" templates without
 /// defining a new type. See [`template`] for usage.
-pub struct FnTemplate<F: Fn(&mut TemplateContext) -> Result<O>, O>(pub F);
+pub struct FnTemplate<F: Fn(&mut TemplateContext) -> Result<O>, O: Component>(pub F);
 
-impl<F: Fn(&mut TemplateContext) -> Result<O> + Clone, O> Template for FnTemplate<F, O> {
+impl<F: Fn(&mut TemplateContext) -> Result<O> + Clone, O: Component> Template for FnTemplate<F, O> {
     type Output = O;
 
     fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
@@ -492,8 +493,35 @@ impl<F: Fn(&mut TemplateContext) -> Result<O> + Clone, O> Template for FnTemplat
 }
 
 /// Returns a "free floating" template for a given `func`. This prevents the need to define a custom type for one-off templates.
-pub fn template<F: Fn(&mut TemplateContext) -> Result<O>, O>(func: F) -> FnTemplate<F, O> {
+pub fn template<F: Fn(&mut TemplateContext) -> Result<O>, O: Component>(
+    func: F,
+) -> FnTemplate<F, O> {
     FnTemplate(func)
+}
+
+/// A [`Template`] driven by a function that returns an output. This is used to create "free floating" templates without
+/// defining a new type. See [`template`] for usage.
+pub struct FnBundleTemplate<F: Fn(&mut TemplateContext) -> Result<O>, O: Bundle>(pub F);
+
+impl<F: Fn(&mut TemplateContext) -> Result<O> + Clone, O: Bundle> Template
+    for FnBundleTemplate<F, O>
+{
+    type Output = O;
+
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
+        (self.0)(context)
+    }
+
+    fn clone_template(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+/// Returns a "free floating" template for a given `func`. This prevents the need to define a custom type for one-off templates.
+pub fn bundle_template<F: Fn(&mut TemplateContext) -> Result<O>, O: Bundle>(
+    func: F,
+) -> FnBundleTemplate<F, O> {
+    FnBundleTemplate(func)
 }
 
 /// Roughly equivalent to [`FromTemplate`], but does not have a blanket implementation for [`Default`] + [`Clone`] types.
